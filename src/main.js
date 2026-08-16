@@ -47,8 +47,6 @@ filterPresenter.init();
 boardPresenter.init();
 infoPresenter.init();
 
-// Справочники (пункты назначения и офферы) загружаются до точек,
-// так как точки ссылаются на них по id
 Promise.all([
   destinationsModel.init(),
   offersModel.init(),
