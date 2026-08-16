@@ -1,40 +1,62 @@
+import DestinationsModel from './model/destinations-model.js';
+import PointsModel from './model/points-model.js';
+import OffersModel from './model/offers-model.js';
+import FiltersModel from './model/filters-model.js';
 import BoardPresenter from './presenter/board-presenter.js';
-import ListFilterView from './view/filter-view.js';
-import InfoView from './view/info-view.js';
-import { render, RenderPosition } from '../framework/render.js';
+import FilterPresenter from './presenter/filter-presenter.js';
+import PointsApiService from './points-api-service.js';
+import InfoPresenter from './presenter/info-presenter.js';
 
-// Селекторы из index.html
+const AUTHORIZATION = 'Basic f39Ul2g16RI528mf';
+const END_POINT = 'https://22.objects.htmlacademy.pro/big-trip';
+
+const filterContainerElement = document.querySelector('.trip-controls__filters');
+const mainElement = document.querySelector('.trip-events');
 const tripMainElement = document.querySelector('.trip-main');
-const tripControlsFiltersElement = document.querySelector('.trip-controls__filters');
-const tripEventsElement = document.querySelector('.trip-events');
 
-// Временные моковые данные для проверки отрисовки (замените на свои, когда появятся модели)
-const mockPoints = [
-  { id: '1', type: 'taxi', basePrice: 120, dateFrom: '2026-08-15T09:00:00.000Z', dateTo: '2026-08-15T10:30:00.000Z', destination: 'dest-1', offers:, isFavorite: false },
-  { id: '2', type: 'flight', basePrice: 500, dateFrom: '2026-08-16T12:00:00.000Z', dateTo: '2026-08-16T16:40:00.000Z', destination: 'dest-2', offers:, isFavorite: true }
-];
-const mockOffers = [
-  { type: 'taxi', offers: [{ id: 1, title: 'Upgrade to business', price: 20 }] },
-  { type: 'flight', offers: [{ id: 2, title: 'Add luggage', price: 50 }, { id: 3, title: 'Choose seat', price: 15 }] }
-];
-const mockDestinations = [
-  { id: 'dest-1', name: 'Amsterdam', description: 'Beautiful city', pictures: [] },
-  { id: 'dest-2', name: 'Geneva', description: 'Swiss city', pictures: [] }
-];
-const mockFilters = [{ type: 'everything', name: 'Everything', count: mockPoints.length }];
+const pointsApiService = new PointsApiService(END_POINT, AUTHORIZATION);
 
-// 1. Отрисовка общих данных путешествия в шапку (в самое начало)
-render(new InfoView({ points: mockPoints, offers: mockOffers, destinations: mockDestinations }), tripMainElement, RenderPosition.AFTERBEGIN);
+const pointsModel = new PointsModel({ pointsApiService });
+const destinationsModel = new DestinationsModel({ pointsApiService });
+const offersModel = new OffersModel({ pointsApiService });
+const filtersModel = new FiltersModel();
 
-// 2. Отрисовка фильтров
-render(new ListFilterView({ filters: mockFilters, currentFilterType: 'everything', onFilterTypeChange: () => {} }), tripControlsFiltersElement);
-
-// 3. Инициализация и запуск главного презентера
-const boardPresenter = new BoardPresenter({
-  boardContainer: tripEventsElement,
-  points: mockPoints,
-  offers: mockOffers,
-  destinations: mockDestinations
+const filterPresenter = new FilterPresenter({
+  filterContainerElement,
+  filtersModel,
+  pointsModel
 });
 
+const boardPresenter = new BoardPresenter({
+  container: mainElement,
+  newPointButtonContainer: tripMainElement,
+  pointsModel,
+  destinationsModel,
+  offersModel,
+  filtersModel,
+});
+
+const infoPresenter = new InfoPresenter({
+  container: tripMainElement,
+  pointsModel,
+  destinationsModel,
+  offersModel,
+});
+
+filterPresenter.init();
 boardPresenter.init();
+infoPresenter.init();
+
+// Справочники (пункты назначения и офферы) загружаются до точек,
+// так как точки ссылаются на них по id
+Promise.all([
+  destinationsModel.init(),
+  offersModel.init(),
+])
+  .then(() => pointsModel.init())
+  .catch(() => {
+    boardPresenter.showLoadError();
+  })
+  .finally(() => {
+    boardPresenter.enableNewPointButton();
+  });
